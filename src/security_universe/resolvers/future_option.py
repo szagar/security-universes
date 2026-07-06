@@ -8,6 +8,20 @@ looks like::
       │     └──────────────── option product/series code (CME)
       └────────────────────── underlying future contract ESU6
 
+The head is two fixed-width, left-justified 5-char fields (future contract,
+then series code). A 2-char root leaves padding after its 4-char contract
+(``ESU6 ``) so the fields read as space-separated — but a 3-char root fills
+its field exactly and the head packs solid::
+
+    ./MESU5EXQ5  250829P6430
+      │    └───────────────── series code EXQ5, no separator
+      └────────────────────── underlying future contract MESU5
+
+Both forms parse here. The packed split is unambiguous because a futures root
+is at most 4 chars (``future.FUTURE_RE``) and CME series codes start with a
+letter — a leading-digit series code would fool the greedy year match, which
+``test_packed_head_assumes_series_codes_start_with_a_letter`` documents.
+
 The option product/series code (``E1CN6``) is CME taxonomy — not computable from
 ``(future, expiry, right, strike)`` — so it cannot live in an algorithmic
 ``security_id``. This resolver captures it (the ``canonical.py`` parser in the
@@ -45,8 +59,10 @@ from security_universe.resolvers.occ import format_strike
 
 DEFAULT_RULE_FILE = "future_option_rules.yaml"
 
-# Head: "./<future-contract> " — same shape as the platform's FUTURE_OPTION_PATTERN.
-_HEAD_RE = re.compile(r"^\./(?P<future>[A-Z0-9]+[FGHJKMNQUVXZ]\d{1,2})\s+(?P<rest>.+)$")
+# Head: "./<future-contract>" then the rest, whitespace-separated OR packed solid
+# (see module docstring). The {1,4} root cap mirrors future.FUTURE_RE and is what
+# makes the packed split unambiguous; \s* (not \s+) admits the packed form.
+_HEAD_RE = re.compile(r"^\./(?P<future>[A-Z0-9]{1,4}[FGHJKMNQUVXZ]\d{1,2})\s*(?P<rest>\S.*)$")
 # Trailing block: YYMMDD + C/P + strike — same shape as the platform's _FUT_OPT_TRAILING.
 _TAIL_RE = re.compile(r"(?P<yymmdd>\d{6})(?P<cp>[CP])(?P<strike>\d+(?:\.\d+)?)$")
 
